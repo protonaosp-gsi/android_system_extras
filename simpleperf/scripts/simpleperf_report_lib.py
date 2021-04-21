@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright (C) 2016 The Android Open Source Project
 #
@@ -22,7 +22,10 @@
 
 import collections
 import ctypes as ct
+from pathlib import Path
 import struct
+from typing import Union
+
 from simpleperf_utils import bytes_to_str, get_host_binary_path, is_windows, str_to_bytes
 
 
@@ -42,6 +45,7 @@ def _char_pt(s):
 
 def _char_pt_to_str(char_pt):
     return bytes_to_str(char_pt)
+
 
 def _check(cond, failmsg):
     if not cond:
@@ -117,7 +121,7 @@ class TracingFieldFormatStruct(ct.Structure):
             length = 0
             while length < self.elem_count and bytes_to_str(data[self.offset + length]) != '\x00':
                 length += 1
-            return bytes_to_str(data[self.offset : self.offset + length])
+            return bytes_to_str(data[self.offset: self.offset + length])
         unpack_key = self._unpack_key_dict.get(self.elem_size)
         if unpack_key:
             if not self.is_signed:
@@ -129,7 +133,7 @@ class TracingFieldFormatStruct(ct.Structure):
             value = []
             offset = self.offset
             for _ in range(self.elem_count):
-                value.append(data[offset : offset + self.elem_size])
+                value.append(data[offset: offset + self.elem_size])
                 offset += self.elem_size
         if self.elem_count == 1:
             value = value[0]
@@ -251,6 +255,8 @@ class ReportLib(object):
         self._ShowIpForUnknownSymbolFunc = self._lib.ShowIpForUnknownSymbol
         self._ShowArtFramesFunc = self._lib.ShowArtFrames
         self._MergeJavaMethodsFunc = self._lib.MergeJavaMethods
+        self._AddProguardMappingFileFunc = self._lib.AddProguardMappingFile
+        self._AddProguardMappingFileFunc.restype = ct.c_bool
         self._GetNextSampleFunc = self._lib.GetNextSample
         self._GetNextSampleFunc.restype = ct.POINTER(SampleStruct)
         self._GetEventOfCurrentSampleFunc = self._lib.GetEventOfCurrentSample
@@ -315,6 +321,11 @@ class ReportLib(object):
             Java methods are merged by default.
         """
         self._MergeJavaMethodsFunc(self.getInstance(), merge)
+
+    def AddProguardMappingFile(self, mapping_file: Union[str, Path]):
+        """ Add proguard mapping.txt to de-obfuscate method names. """
+        if not self._AddProguardMappingFileFunc(self.getInstance(), _char_pt(str(mapping_file))):
+            raise ValueError(f'failed to add proguard mapping file: {mapping_file}')
 
     def SetKallsymsFile(self, kallsym_file):
         """ Set the file path to a copy of the /proc/kallsyms file (for off device decoding) """

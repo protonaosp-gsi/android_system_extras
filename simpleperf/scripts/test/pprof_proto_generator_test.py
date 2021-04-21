@@ -15,19 +15,20 @@
 # limitations under the License.
 
 import google.protobuf
+
 from pprof_proto_generator import load_pprof_profile
-from . test_utils import TestBase, TEST_HELPER
+from . test_utils import TestBase, TestHelper
 
 
 class TestPprofProtoGenerator(TestBase):
     def run_generator(self, options=None, testdata_file='perf_with_interpreter_frames.data'):
-        testdata_path = TEST_HELPER.testdata_path(testdata_file)
+        testdata_path = TestHelper.testdata_path(testdata_file)
         options = options or []
         self.run_cmd(['pprof_proto_generator.py', '-i', testdata_path] + options)
         return self.run_cmd(['pprof_proto_generator.py', '--show'], return_output=True)
 
     def generate_profile(self, options, testdata_files):
-        testdata_paths = [TEST_HELPER.testdata_path(f) for f in testdata_files]
+        testdata_paths = [TestHelper.testdata_path(f) for f in testdata_files]
         options = options or []
         self.run_cmd(['pprof_proto_generator.py', '-i'] + testdata_paths + options)
         return load_pprof_profile('pprof.profile')
@@ -98,3 +99,14 @@ class TestPprofProtoGenerator(TestBase):
         # pylint: disable=no-member
         self.assertGreater(len(profile_both.sample), len(profile1.sample))
         self.assertGreater(len(profile_both.sample), len(profile2.sample))
+
+    def test_proguard_mapping_file(self):
+        """ Test --proguard-mapping-file option. """
+        testdata_file = 'perf_need_proguard_mapping.data'
+        proguard_mapping_file = TestHelper.testdata_path('proguard_mapping.txt')
+        original_methodname = 'androidx.fragment.app.FragmentActivity.startActivityForResult'
+        # Can't show original method name without proguard mapping file.
+        self.assertNotIn(original_methodname, self.run_generator(testdata_file=testdata_file))
+        # Show original method name with proguard mapping file.
+        self.assertIn(original_methodname, self.run_generator(
+            ['--proguard-mapping-file', proguard_mapping_file], testdata_file))
